@@ -1,0 +1,14 @@
+# .gitignore
+
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+.env.*
+.DS_Store
+.idea/
+*.db
+processed_texts.db
