@@ -5,8 +5,11 @@ from models import Base, ProcessedText
 from database import SessionLocal, engine
 from utils.text_processor import process_text_with_gpt
 from routers import search_router, summarize_router, stt_router
+from routers import auth_router
+
 
 app = FastAPI()
+
 
 # DB 테이블 생성
 Base.metadata.create_all(bind=engine)
@@ -24,6 +27,8 @@ def get_db():
 app.include_router(search_router.router)
 app.include_router(summarize_router.router)
 app.include_router(stt_router.router)
+app.include_router(auth_router.router)
+
 
 # ===== 모델 정의 =====
 class UserText(BaseModel):
