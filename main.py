@@ -6,10 +6,20 @@ from database import SessionLocal, engine
 from utils.text_processor import process_text_with_gpt
 from routers import search_router, summarize_router, stt_router
 from routers import auth_router
+from dotenv import load_dotenv
+import logging
 
+# 로깅 기본 설정
+logging.basicConfig(
+    level=logging.INFO,  # 개발 중엔 DEBUG도 가능
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
+
+load_dotenv()
 
 app = FastAPI()
-
 
 # DB 테이블 생성
 Base.metadata.create_all(bind=engine)
