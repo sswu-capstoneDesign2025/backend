@@ -1,6 +1,7 @@
 # models.py
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -13,3 +14,11 @@ class ProcessedText(Base):
     standardized_text = Column(String)
     cleaned_text      = Column(String)
     summary_text      = Column(String)
+
+class SummaryNote(Base):
+    __tablename__ = "summary_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sum_title = Column(String, nullable=False)
+    content = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
