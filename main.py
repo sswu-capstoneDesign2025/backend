@@ -1,12 +1,22 @@
 from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from models import Base, ProcessedText
+from fastapi.middleware.cors import CORSMiddleware
+from models import Base, ProcessedText, SummaryNote
 from database import SessionLocal, engine
 from utils.text_processor import process_text_with_gpt
 from routers import search_router, summarize_router, stt_router
+from datetime import datetime
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*",]
+)
 
 # DB 테이블 생성
 Base.metadata.create_all(bind=engine)
@@ -52,4 +62,42 @@ async def process_user_text(user_text: UserText, db: Session = Depends(get_db)):
             "cleaned": cleaned_text,
             "summary": summary_text
         }
+    }
+
+class summaryNoteCreate(BaseModel):
+    sum_title: str
+    content: str
+
+
+@app.post("/summary-notes/")
+def create_summary_note(note: summaryNoteCreate, db: Session = Depends(get_db)):
+    db_note = SummaryNote(
+        sum_title=note.sum_title,
+        content=note.content
+    )
+    db.add(db_note)
+    db.commit()
+    db.refresh(db_note)
+    return {
+        "message": "Summary note saved!",
+        "note": {
+            "id": db_note.id,
+            "sum_title": db_note.sum_title,
+            "content": db_note.content,
+            "created_at": db_note.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        }
+    }
+
+@app.get("/summary-notes/")
+def get_all_summary_notes(db: Session = Depends(get_db)):
+    notes = db.query(SummaryNote).order_by(SummaryNote.created_at.desc()).all()
+    return {
+        "notes": [
+            {
+                "id": note.id,
+                "sum_title": note.sum_title,
+                "content": note.content,
+                "created_at": note.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            } for note in notes
+        ]
     }
