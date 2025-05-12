@@ -22,3 +22,14 @@ class SummaryNote(Base):
     sum_title = Column(String, nullable=False)
     content = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class OtherUserRecord(Base):
+    __tablename__ = "other_user_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(DateTime, default=datetime.utcnow)
+    title = Column(String, nullable=False)
+    content = Column(String, nullable=False)
+    author = Column(String, nullable=False)
+    profileUrl = Column(String, nullable=True)
+    
