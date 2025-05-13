@@ -3,6 +3,8 @@
 import requests
 from bs4 import BeautifulSoup
 import random
+import urllib.parse
+
 
 # 샘플 인물 리스트
 person_keywords = [
@@ -74,38 +76,28 @@ def refine_keyword_for_search(keyword: str) -> str:
     else:
         return random.choice(general_patterns)
 
-def search_news_by_keywords(keywords: list, max_per_keyword: int = 3) -> dict:
-    """
-    키워드 리스트를 받아서
-    각 키워드별로 뉴스 URL max_per_keyword개씩 가져오는 함수
-    """
+def search_news_by_keywords(keywords: list[str], max_per_keyword: int = 3) -> dict:
+    client_id = "MyCo0RA2Y8r4eqePKFaS"
+    client_secret = "wN9Woc8Ixq"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"
+        "X-Naver-Client-Id": client_id,
+        "X-Naver-Client-Secret": client_secret
     }
 
-    all_results = {}
+    results = {}
 
     for keyword in keywords:
-        refined_keyword = refine_keyword_for_search(keyword)
-        search_url = f"https://search.naver.com/search.naver?where=news&query={refined_keyword}"
-
+        query = urllib.parse.quote(keyword)
+        url = f"https://openapi.naver.com/v1/search/news?query={query}&display={max_per_keyword}&start=1&sort=sim"
         try:
-            response = requests.get(search_url, headers=headers)
+            response = requests.get(url, headers=headers)
             response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            links = []
-            news_items = soup.select(".news_tit")
-
-            for item in news_items[:max_per_keyword]:
-                link = item.get("href")
-                if link:
-                    links.append(link)
-
-            all_results[keyword] = links
-
+            data = response.json()
+            urls = [item["originallink"] for item in data["items"]]
+            results[keyword] = urls
         except Exception as e:
-            print(f"Error during news search for {keyword}: {e}")
-            all_results[keyword] = []
+            print(f"[ERROR] {keyword} 실패: {e}")
+            results[keyword] = []
 
-    return all_results
+    return results
+
