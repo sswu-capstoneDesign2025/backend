@@ -1,33 +1,30 @@
-# (뉴스 URL 리스트 → 쉬운 요약)
+# (뉴스 본문 리스트 → 쉬운 요약)
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-from crawling.newscrawling import crawl_news
-from utils.text_processor import process_text_with_gpt
+from utils.text_processor import simplify_article_content, combine_summaries_into_story
 
 router = APIRouter()
 
-class URLListRequest(BaseModel):
-    urls: list
+class Article(BaseModel):
+    url: str
+    content: str
+
+class ArticleListRequest(BaseModel):
+    keyword: str
+    articles: list[Article]
 
 @router.post("/summarize-news-from-urls/")
-async def summarize_news_from_urls(url_list_request: URLListRequest):
-    """
-    뉴스 URL 리스트를 받아
-    각각 본문 크롤링 후 쉬운 요약을 반환합니다.
-    """
-    summaries = []
+async def summarize_news_from_urls(article_list_request: ArticleListRequest):
+    simplified_summaries = []
 
-    for url in url_list_request.urls:
-        news_content = crawl_news(url)
-        if news_content:
-            _, _, easy_summary = process_text_with_gpt(news_content)
+    for article in article_list_request.articles:
+        simplified = simplify_article_content(article.content)
+        simplified_summaries.append(simplified)
 
-            summaries.append({
-                "url": url,
-                "summary": easy_summary
-            })
+    full_story = combine_summaries_into_story(simplified_summaries)
 
     return {
-        "news_summaries": summaries
+        "keyword": article_list_request.keyword,
+        "news_summary": full_story
     }
