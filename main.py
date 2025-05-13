@@ -1,11 +1,12 @@
 from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from models import Base, ProcessedText
+from fastapi.middleware.cors import CORSMiddleware
+from models import Base, ProcessedText, SummaryNote, OtherUserRecord
 from database import SessionLocal, engine
 from utils.text_processor import process_text_with_gpt
-from routers import search_router, summarize_router, stt_router
-from routers import auth_router
+from routers import search_router, summarize_router, stt_router, story_router, otherstory_router, auth_router
+from datetime import datetime
 from dotenv import load_dotenv
 import logging
 
@@ -19,7 +20,16 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*",]
+)
 
 # DB 테이블 생성
 Base.metadata.create_all(bind=engine)
@@ -37,6 +47,8 @@ def get_db():
 app.include_router(search_router.router)
 app.include_router(summarize_router.router)
 app.include_router(stt_router.router)
+app.include_router(story_router.router)
+app.include_router(otherstory_router.router)
 app.include_router(auth_router.router)
 
 
