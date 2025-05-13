@@ -16,10 +16,11 @@ async def search_news_urls(user_request: UserRequest):
     자연어 입력받아 키워드를 추출하고,
     키워드로 뉴스 검색하여 URL 리스트를 반환합니다.
     """
-    keyword = extract_keyword_from_text(user_request.request_text)
-    news_urls = search_news_by_keywords([keyword])[keyword] 
+    keywords = extract_keyword_from_text(user_request.request_text)  
+
+    news_results = search_news_by_keywords(keywords)
 
     return {
-        "keyword": keyword,
-        "urls": news_urls
+        "keywords": keywords,
+        "results": news_results
     }
