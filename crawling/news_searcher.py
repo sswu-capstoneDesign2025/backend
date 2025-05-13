@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()  # .env 파일 로드
 
-client_id = os.getenv("NAVER_CLIENT_ID")
-client_secret = os.getenv("NAVER_CLIENT_SECRET")
+client_id = os.getenv("NAVER2_CLIENT_ID")
+client_secret = os.getenv("NAVER2_CLIENT_SECRET")
 
 
 # 샘플 인물 리스트
@@ -102,7 +102,7 @@ def search_news_by_keywords(keywords: list[str], max_per_keyword: int = 3) -> di
             response = requests.get(url, headers=headers)
             response.raise_for_status()
             data = response.json()
-            urls = [item["originallink"] for item in data["items"]]
+            urls = [item["link"] for item in data["items"]] 
             results[keyword] = urls
         except Exception as e:
             print(f"[ERROR] {keyword} 실패: {e}")
