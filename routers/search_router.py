@@ -3,37 +3,46 @@ from pydantic import BaseModel
 from crawling.news_searcher import search_news_by_keywords
 from crawling.news_content import get_article_content
 from utils.keyword_extractor import extract_keyword_from_text
+from utils.text_processor import simplify_article_content  # ✅ 요약 함수 추가
 
 router = APIRouter()
 
 class UserRequest(BaseModel):
     request_text: str
 
-# 뉴스 본문 크롤링 함수
-def get_top3_article_contents_from_result(result_dict: dict) -> list:
+# 뉴스 본문 + 요약 처리 함수
+def get_top3_summarized_articles(result_dict: dict) -> list:
     keywords = result_dict.get("keywords", [])
     results = result_dict.get("results", {})
 
     if not keywords:
-        return ["키워드가 없습니다."]
+        return [{"url": "", "summary": "키워드를 추출할 수 없습니다."}]
 
     first_keyword = keywords[0]
     urls = results.get(first_keyword, [])[:3]
 
-    contents = []
+    summaries = []
     for url in urls:
         content = get_article_content(url)
-        contents.append({
-            "url": url,
-            "content": content
-        })
+        if content and "에러 발생" not in content:
+            try:
+                summary = simplify_article_content(content)
+                summaries.append({
+                    "url": url,
+                    "summary": summary
+                })
+            except Exception as e:
+                summaries.append({
+                    "url": url,
+                    "summary": f"요약 실패: {e}"
+                })
 
-    return contents
+    return summaries
 
 @router.post("/search-news-urls/")
 async def search_news_urls(user_request: UserRequest):
     """
-    자연어 입력 → 키워드 추출 → 뉴스 URL 검색 → 첫 키워드 상위 3개 뉴스 본문 추출
+    자연어 입력 → 키워드 추출 → 뉴스 URL 검색 → 본문 → GPT 요약 반환
     """
     keywords = extract_keyword_from_text(user_request.request_text)
     news_results = search_news_by_keywords(keywords)
@@ -43,9 +52,6 @@ async def search_news_urls(user_request: UserRequest):
         "results": news_results
     }
 
-    article_contents = get_top3_article_contents_from_result(result_dict)
+    article_summaries = get_top3_summarized_articles(result_dict)
 
-    return {
-        "keyword": keywords[0] if keywords else "",
-        "articles": article_contents
-    }
+    return article_summaries

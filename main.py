@@ -20,7 +20,12 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
-app = FastAPI()
+app = FastAPI(
+    title="Capstone API",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
 
 app.add_middleware(
     CORSMiddleware,
