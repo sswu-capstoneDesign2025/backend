@@ -84,6 +84,10 @@ def refine_keyword_for_search(keyword: str) -> str:
         return random.choice(general_patterns)
 
 def search_news_by_keywords(keywords: list[str], max_per_keyword: int = 3) -> dict:
+    """
+    키워드 리스트를 받아서
+    각 키워드별로 뉴스 URL max_per_keyword개씩 가져오는 함수
+    """
     headers = {
         "X-Naver-Client-Id": client_id,
         "X-Naver-Client-Secret": client_secret
