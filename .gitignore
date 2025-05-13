@@ -12,3 +12,4 @@ venv/
 .idea/
 *.db
 processed_texts.db
+.venv/

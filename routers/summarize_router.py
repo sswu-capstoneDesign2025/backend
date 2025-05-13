@@ -1,4 +1,5 @@
 # (뉴스 본문 리스트 → 쉬운 요약)
+# search_router.py에 통합
 
 from fastapi import APIRouter
 from pydantic import BaseModel
