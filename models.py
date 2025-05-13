@@ -5,6 +5,16 @@ from datetime import datetime
 
 Base = declarative_base()
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    name = Column(String)                
+    phone_number = Column(String)        
+    hashed_password = Column(String)
+
+
 class ProcessedText(Base):
     __tablename__ = "processed_texts"
 
