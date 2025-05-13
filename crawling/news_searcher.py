@@ -4,6 +4,13 @@ import requests
 from bs4 import BeautifulSoup
 import random
 import urllib.parse
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # .env 파일 로드
+
+client_id = os.getenv("NAVER_CLIENT_ID")
+client_secret = os.getenv("NAVER_CLIENT_SECRET")
 
 
 # 샘플 인물 리스트
@@ -77,8 +84,10 @@ def refine_keyword_for_search(keyword: str) -> str:
         return random.choice(general_patterns)
 
 def search_news_by_keywords(keywords: list[str], max_per_keyword: int = 3) -> dict:
-    client_id = "MyCo0RA2Y8r4eqePKFaS"
-    client_secret = "wN9Woc8Ixq"
+    """
+    키워드 리스트를 받아서
+    각 키워드별로 뉴스 URL max_per_keyword개씩 가져오는 함수
+    """
     headers = {
         "X-Naver-Client-Id": client_id,
         "X-Naver-Client-Secret": client_secret

@@ -1,5 +1,4 @@
 # 뉴스 크롤링 기능 (ipynb → py 변환)
-
 import requests
 from bs4 import BeautifulSoup
 
