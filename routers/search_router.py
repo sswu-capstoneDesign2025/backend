@@ -3,7 +3,9 @@ from pydantic import BaseModel
 from crawling.news_searcher import search_news_by_keywords
 from crawling.news_content import get_article_content
 from utils.keyword_extractor import extract_keyword_from_text
-from utils.text_processor import simplify_article_content  # ✅ 요약 함수 추가
+from utils.text_processor import simplify_article_content  #  요약 함수 추가
+from fastapi.responses import JSONResponse
+
 
 router = APIRouter()
 
