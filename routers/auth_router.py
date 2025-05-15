@@ -79,6 +79,12 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     logger.info(f"Login successful: {user.username}")
     return {"access_token": token, "token_type": "bearer"}
 
+# 아이디 중복 확인 API
+@router.get("/check-username")
+def check_username(username: str, db: Session = Depends(get_db)):
+    user = get_user_by_username(db, username)
+    return {"available": user is None}
+
 
 @router.get("/kakao/login")
 def kakao_login():
