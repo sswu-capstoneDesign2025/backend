@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from models import Base, ProcessedText, SummaryNote, OtherUserRecord
 from database import SessionLocal, engine
-from routers import search_router, summarize_router, stt_router, story_router, otherstory_router, auth_router
+from routers import search_router, stt_router, story_router, otherstory_router, auth_router
 from datetime import datetime
 from dotenv import load_dotenv
 import logging
@@ -49,7 +49,6 @@ def get_db():
 
 # Router 등록
 app.include_router(search_router.router)
-app.include_router(summarize_router.router)
 app.include_router(stt_router.router)
 app.include_router(story_router.router)
 app.include_router(otherstory_router.router)
