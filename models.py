@@ -2,6 +2,7 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
+from sqlalchemy import ForeignKey, Boolean
 
 Base = declarative_base()
 
@@ -42,4 +43,23 @@ class OtherUserRecord(Base):
     content = Column(String, nullable=False)
     author = Column(String, nullable=False)
     profileUrl = Column(String, nullable=True)
+
     
+class UserHealthAlert(Base):
+    __tablename__ = "user_health_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    alert_id = Column(Integer, ForeignKey("health_alerts.id"), nullable=False)
+
+    enabled = Column(Boolean, default=True)  # ON/OFF 스위치
+
+
+    from sqlalchemy import Column, Integer, String
+
+class HealthAlert(Base):
+    __tablename__ = "health_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    time = Column(String, nullable=False)        # 예: "오전 9:00"
+    message = Column(String, nullable=False)     # 예: "스트레칭 시간입니다."
