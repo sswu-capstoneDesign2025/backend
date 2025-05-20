@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from models import Base, ProcessedText, SummaryNote, OtherUserRecord
 from database import SessionLocal, engine
 from routers import search_router, stt_router, story_router, otherstory_router, auth_router
-from datetime import datetime
+from routers.user_alert_router import router as user_alert_router
 from dotenv import load_dotenv
 import logging
 
@@ -53,5 +53,7 @@ app.include_router(stt_router.router)
 app.include_router(story_router.router)
 app.include_router(otherstory_router.router)
 app.include_router(auth_router.router)
+app.include_router(user_alert_router)
+
 
 
