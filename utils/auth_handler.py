@@ -1,5 +1,6 @@
 # 인증 관련 유틸
 
+from fastapi import HTTPException
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
@@ -23,3 +24,11 @@ def create_access_token(data: dict, expires_delta: timedelta = timedelta(hours=1
     expire = datetime.utcnow() + expires_delta
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def decode_access_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.JWTError as e:
+        print(f"[JWT 디코딩 실패] {e}")
+        raise HTTPException(status_code=401, detail="Invalid or expired token") 
