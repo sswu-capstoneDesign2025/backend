@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from models import User, HealthAlert, UserHealthAlert, Base 
 
 # SQLite 데이터베이스 연결 URL
-SQLALCHEMY_DATABASE_URL = "sqlite:///./processed_texts.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
 # Engine 생성
 engine = create_engine(
