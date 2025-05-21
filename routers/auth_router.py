@@ -8,9 +8,13 @@ from database import get_user_by_username, create_user
 from models import User
 from utils.auth_handler import hash_password, verify_password, create_access_token
 from database import SessionLocal
+from fastapi.security import OAuth2PasswordBearer
+from utils.auth_handler import decode_access_token
+from utils.nickname_generator import generate_unique_nickname
 import os
 import requests
-from fastapi import Request
+from fastapi import UploadFile, File
+import shutil
 from dotenv import load_dotenv
 from fastapi.responses import RedirectResponse
 import uuid
@@ -19,6 +23,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 load_dotenv()
 
@@ -57,14 +62,17 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Username already registered")
     
     hashed_pw = hash_password(user.password)
+    nickname = generate_unique_nickname(db) 
+
     db_user = User(
         username=user.username,
         hashed_password=hashed_pw,
         name=user.name,
-        phone_number=user.phone_number
+        phone_number=user.phone_number,
+        nickname=nickname
     )
     result = create_user(db, db_user)
-    logger.info(f"User created successfully: {user.username}")
+    logger.info(f"User created successfully: {user.username} with nickname: {nickname}")
     return result
 
 @router.post("/login")
@@ -85,6 +93,51 @@ def check_username(username: str, db: Session = Depends(get_db)):
     user = get_user_by_username(db, username)
     return {"available": user is None}
 
+# 사용자 정보 반환 API
+@router.get("/me")
+def get_my_profile(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    payload = decode_access_token(token)
+    username = payload.get("sub")
+
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = get_user_by_username(db, username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "username": user.username,
+        "name": user.name,
+        "nickname": user.nickname,
+        "profile_image": user.profile_image 
+    }
+
+@router.post("/profile-image")
+def upload_profile_image(file: UploadFile = File(...), token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    payload = decode_access_token(token)
+    username = payload.get("sub")
+
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = get_user_by_username(db, username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    upload_dir = "static/profile_images"
+    os.makedirs(upload_dir, exist_ok=True)
+    filename = f"{username}_{file.filename}"
+    file_path = os.path.join(upload_dir, filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    image_url = f"/static/profile_images/{filename}"
+    user.profile_image = image_url
+    db.commit()
+
+    return {"message": "Upload successful", "image_url": image_url}
 
 @router.get("/kakao/login")
 def kakao_login():
@@ -165,11 +218,14 @@ def kakao_extra_info(data: KakaoExtraInfo, db: Session = Depends(get_db)):
         logger.warning(f"Kakao user already exists: {data.kakao_id}")
         raise HTTPException(status_code=400, detail="User already exists")
 
+    nickname = generate_unique_nickname(db)
+
     user = User(
         username=data.kakao_id,
         name=data.name,
         phone_number=data.phone_number,
-        hashed_password=hash_password(str(uuid.uuid4()))
+        hashed_password=hash_password(str(uuid.uuid4())),
+        nickname=nickname
     )
     create_user(db, user)
     logger.info(f"Kakao user created and logged in: {data.kakao_id}")
@@ -219,21 +275,23 @@ def naver_callback(code: str, state: str, db: Session = Depends(get_db)):
         phone = profile_json["response"].get("mobile", "")
 
         user = get_user_by_username(db, naver_id)
-
+        nickname = generate_unique_nickname(db)
         if not user:
+            
             logger.info(f"Naver user not found, creating new user.")
             user = User(
                 username=naver_id,
                 name=name,
                 phone_number=phone,
-                hashed_password=hash_password(str(uuid.uuid4()))
+                hashed_password=hash_password(str(uuid.uuid4())),
+                nickname=nickname
             )
             create_user(db, user)
 
         jwt_token = create_access_token({"sub": user.username})
         logger.info(f"Naver login success for user: {user.username}")
 
-        # ✅ Flutter 앱으로 리디렉션 (딥링크 URI에 토큰 전달)
+        # Flutter 앱으로 리디렉션 (딥링크 URI에 토큰 전달)
         return RedirectResponse(url=f"myapp://auth?token={jwt_token}")
 
     except Exception as e:

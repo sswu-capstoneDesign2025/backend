@@ -1,52 +1,51 @@
-from dotenv import load_dotenv
+# utils/stt_processor.py
 import os
 import requests
-
-# 환경변수 로드
+from urllib.parse import urlparse
+import json
+from dotenv import load_dotenv
 load_dotenv(override=True)
 
 DOMAIN_ID     = os.getenv("DOMAIN_ID", "").strip()
 INVOKE_SECRET = os.getenv("CLOVA_INVOKE_SECRET", "").strip()
 HEADER_SECRET = os.getenv("CLOVA_SPEECH_SECRET", "").strip()
 
-assert DOMAIN_ID,     "❌ DOMAIN_ID 로드 실패"
-assert INVOKE_SECRET, "❌ Invoke URL용 시크릿 로드 실패"
-assert HEADER_SECRET, "❌ 헤더용 시크릿 로드 실패"
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 def transcribe_audio_from_url(file_url: str) -> str:
-    """
-    CLOVA Speech-to-Text API를 사용해
-    주어진 음성 파일 URL을 텍스트로 변환하여 반환합니다.
-    예외 발생 시 에러 메시지로 Exception을 raise합니다.
-    """
-    # Invoke URL 조립
+    parsed = urlparse(file_url)
+    if not parsed.path.startswith("/static/"):
+        raise Exception("❌ 이 방식은 서버 내부 static 경로에서만 동작합니다.")
+
+    local_path = os.path.join(BASE_DIR, parsed.path.lstrip("/"))
+    if not os.path.isfile(local_path):
+        raise Exception(f"❌ 파일 없음: {local_path}")
+
     invoke_url = (
         f"https://clovaspeech-gw.ncloud.com/external/v1/"
-        f"{DOMAIN_ID}/{INVOKE_SECRET}/recognizer/url"
+        f"{DOMAIN_ID}/{INVOKE_SECRET}/recognizer/upload"
     )
 
     headers = {
-        "Content-Type": "application/json",
         "X-CLOVASPEECH-API-KEY": HEADER_SECRET,
     }
 
-    payload = {
-        "url":        file_url,
-        "language":   "ko-KR",
-        "completion": "sync",
+    files = {
+        "media": open(local_path, "rb"),
+        "params": (None, json.dumps({
+            "language": "ko-KR",
+            "completion": "sync",
+            "fullText": True,
+            "wordAlignment": True,
+        }), "application/json"),
     }
 
-    # 요청 보내기
-    response = requests.post(invoke_url, headers=headers, json=payload)
+    response = requests.post(invoke_url, headers=headers, files=files)
 
-    # 응답 처리
     if response.status_code == 200:
-        data = response.json()
-        result = data.get("result")
-        if result in ("COMPLETED", "SUCCEEDED"):
-            return data.get("text", "").strip()
-        else:
-            error_msg = data.get("message", "Unknown error")
-            raise Exception(f"❌ 변환 실패 [{result}]: {error_msg}")
-    else:
-        raise Exception(f"❌ HTTP 오류 {response.status_code}: {response.text}")
+        result = response.json()
+        if result.get("result") not in ("SUCCESS", "COMPLETED"):
+            raise Exception(f"❌ CLOVA 응답 실패: {result}")
+
+        # 성공 시 텍스트 추출
+        return result.get("text", "")

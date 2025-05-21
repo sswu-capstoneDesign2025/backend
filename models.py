@@ -14,6 +14,9 @@ class User(Base):
     name = Column(String)                
     phone_number = Column(String)        
     hashed_password = Column(String)
+    nickname = Column(String, nullable=False)
+    profile_image = Column(String, nullable=True) 
+
 
 
 class ProcessedText(Base):
