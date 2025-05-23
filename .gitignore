@@ -13,3 +13,5 @@ venv/
 *.db
 processed_texts.db
 .venv/
+
+static/

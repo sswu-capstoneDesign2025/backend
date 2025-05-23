@@ -4,6 +4,12 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import re
 
+from utils.keyword_extractor import (
+    extract_keyword_from_text,
+    extract_passages_by_keywords
+)
+
+
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI()
@@ -37,71 +43,89 @@ def long_article_summary(text: str) -> str:
     return m.group(1).strip() if m else out.strip()
 
 
-def refine_summary(text: str) -> str:
+
+def simplify_for_borderline(text: str) -> str:
     """
-    2차 다듬기: GPT-4-turbo 로 뉴스 기사 문체(+“~라고 했습니다”)로 정제
+    2차 다듬기: 
+    - 경계선 지능 수준 사용자도 이해할 수 있도록
+    - 문장은 짧고 간단하게
+    - 어려운 단어는 쉬운 말로 바꿔줌
     """
     prompt = f"""
     아래는 이미 요약된 뉴스입니다.
-    한 문단으로, 문장 끝을 모두 "~라고 했습니다"로 맞추고,
-    정치 용어·복잡한 표현은 풀어서 쓰되, 구어체는 쓰지 말아주세요.
-
+    경계선 지능형 장애인 수준의 사용자도 쉽게 이해할 수 있게 하나의 뉴스로 재작성해주세요.
+    - 한 문장에 하나의 정보만 담아주세요.
+    - 문장은 최대 2~3줄로 짧게.
+    - 어려운 단어는 쉬운 말로 바꿔주세요.
+    - 필요하다면 어려운 말 앞에 추가 설명을 넣어주세요.(ex. 배터리의 한 종류인 납축전지)
+    - 친근하게 말하는 말투로 바꿔주세요.
+    
     [요약된 뉴스]
     {text}
 
     [출력 형식]
-    - 기사:
+    - 간단한 요약:
     """
     resp = client.chat.completions.create(
-        model="gpt-4-turbo",
+        model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "너는 뉴스 편집 기자야."},
+            {"role": "system", "content": "너는 어린이용 뉴스 편집자야."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.3,
-        max_tokens=500
+        temperature=0.2,
+        max_tokens=1000
     )
     out = resp.choices[0].message.content
-    m = re.search(r"기사\s*:\s*(.+)", out, re.DOTALL)
+    m = re.search(r"간단한 요약:\s*(.+)", out, re.DOTALL)
     return m.group(1).strip() if m else out.strip()
 
 
-def summarize_article_pipeline(text: str) -> str:
+def summarize_article_pipeline(
+    text: str,
+    user_query: str,
+    window: int = 1
+) -> str:
     """
-    1단계: 긴 기사 압축 → 2단계: 문체 다듬기
+    1) user_query에서 핵심 키워드 추출
+    2) 기사 본문에서 키워드 주변 문장만 필터링
+    3) GPT-3.5로 압축 요약 → 어린이용으로 쉬운 문장으로 변환
     """
-    short = long_article_summary(text)
-    return refine_summary(short)
+    keywords = extract_keyword_from_text(user_query)
+    filtered = extract_passages_by_keywords(text, keywords, window=window)
+    short = long_article_summary(filtered)
+    return simplify_for_borderline(short)
+
 
 
 def combine_summaries_into_story(summaries: list[str]) -> str:
     """
-    여러 요약을 하나의 통합 뉴스 기사처럼 자연스럽게 묶어주는 함수
+    여러 요약을 하나로 묶은 뒤, 
+    경계선 지능 수준의 사용자도 이해할 수 있게 쉽고 명확하게 정리
     """
     combined = "\n\n".join(summaries)
     prompt = f"""
-    아래에 여러 뉴스 요약이 있습니다.
-    이들을 중복 없이 하나의 뉴스 기사처럼 자연스럽게 이어서 정리해 주세요.
-    주제별 흐름을 고려해서 문단을 정리하고,
-    마지막엔 '오늘의 주요 뉴스였습니다'로 마무리해 주세요.
-
-    문장 끝은 모두 '~라고 했습니다' 형태로 통일하고,
-    친구에게 말하는 식 표현은 사용하지 말아주세요.
+    아래는 여러 뉴스 요약입니다.
+    이들을 중복 없이 하나의 쉽고 명확한 이야기로 이어주세요.
+    - 문장은 짧게, 한 문장당 하나의 정보.
+    - 어려운 용어 대신 쉬운 말 사용.
+    - 필요하면 괄호 안에 간단한 추가 설명 포함.
+    - 마지막에 '이상이 오늘의 뉴스입니다.'로 마무리.
 
     [요약 목록]
     {combined}
 
     [출력 형식]
-    - 종합 뉴스 기사:
+    - 쉬운 뉴스:
     """
     resp = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "너는 여러 뉴스를 하나로 엮는 뉴스 편집 기자야."},
+            {"role": "system", "content": "너는 어린이용 뉴스 편집자야."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.3
+        temperature=0.2,
+        max_tokens=1200
     )
     out = resp.choices[0].message.content
-    m = re.search(r"기사\s*:\s*(.+)", out, re.DOTALL)
+    m = re.search(r"쉬운 뉴스:\s*(.+)", out, re.DOTALL)
     return m.group(1).strip() if m else out.strip()

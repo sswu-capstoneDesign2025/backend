@@ -3,13 +3,13 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from models import Base, ProcessedText, SummaryNote, OtherUserRecord
-from routers.upload_router import router as upload_router
 from database import SessionLocal, engine
 from routers import search_router, stt_router, story_router, otherstory_router, auth_router
 from routers.user_alert_router import router as user_alert_router
 from dotenv import load_dotenv
 import logging
 from fastapi.staticfiles import StaticFiles
+from routers.processing_router import router as processing_router
 
 # 로깅 기본 설정
 logging.basicConfig(
@@ -56,7 +56,7 @@ app.include_router(story_router.router)
 app.include_router(otherstory_router.router)
 app.include_router(auth_router.router)
 app.include_router(user_alert_router)
-app.include_router(upload_router)
+app.include_router(processing_router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
