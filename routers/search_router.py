@@ -22,7 +22,7 @@ def relevance_score(content: str, keyword: str) -> int:
     lower_content = content.lower()
     return sum(1 for token in keyword.split() if token.lower() in lower_content)
 
-def get_top3_summarized_articles(result_dict: dict) -> list:
+def get_top3_summarized_articles(result_dict: dict, user_query: str) -> list:
     keywords = result_dict.get("keywords", [])
     results = result_dict.get("results", {})
 
@@ -46,7 +46,7 @@ def get_top3_summarized_articles(result_dict: dict) -> list:
 
         try:
             # 2단계 파이프라인으로 요약
-            summary = summarize_article_pipeline(content)
+            summary = summarize_article_pipeline(content, user_query)
             summaries.append({"url": url, "summary": summary})
         except Exception as e:
             summaries.append({"url": url, "summary": f"요약 실패: {e}"})
@@ -79,11 +79,11 @@ async def search_news_urls(user_request: UserRequest):
         }
 
     # 뉴스 검색
-    news_results = search_news_by_keywords(keywords)
+    news_results = await search_news_by_keywords(keywords)
     result_dict = {"keywords": keywords, "results": news_results}
 
     # 1) 개별 기사 요약 3개
-    article_summaries = get_top3_summarized_articles(result_dict)
+    article_summaries = get_top3_summarized_articles(result_dict, text)
 
     # 2) 요약문만 모아서 종합 기사 생성
     summary_texts = [item["summary"] for item in article_summaries]
