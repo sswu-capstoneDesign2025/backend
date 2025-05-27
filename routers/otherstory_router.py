@@ -58,3 +58,12 @@ def get_other_user_records(db: Session = Depends(get_db)):
             "profileUrl": r.profileUrl
         } for r in records
     ]
+
+@router.delete("/other-user-records/")
+def delete_all_other_user_records(db: Session = Depends(get_db)):
+    deleted_count = db.query(OtherUserRecord).delete()
+    db.commit()
+    return {
+        "message": f"모든 기록이 삭제되었습니다.",
+        "deleted_count": deleted_count
+    }

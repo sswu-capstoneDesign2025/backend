@@ -1,7 +1,7 @@
 # crawling/weather_fetcher.py
 
 import requests, urllib.parse, re
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, SoupStrainer
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -17,19 +17,71 @@ def _get_soup(location: str) -> BeautifulSoup:
     resp.raise_for_status()
     return BeautifulSoup(resp.text, "html.parser")
 
+def extract_air_quality(soup):
+    pm10_text, pm25_text = None, None
+    items = soup.select("ul.today_chart_list li.item_today")
 
-def get_current_weather(location: str) -> str | None:
-    soup = _get_soup(location)
-    span_now = soup.find("span", string=re.compile("현재 온도"))
-    current_temp = span_now.next_sibling.strip() if span_now else None
+    for item in items:
+        box = item.select_one(".box") or item  # 💡 Fallback: 그냥 item 내부에서 찾기
+        label_tag = box.select_one("strong.title")
+        value_tag = box.select_one("span.txt")
 
+        label = label_tag.get_text(strip=True) if label_tag else None
+        value = value_tag.get_text(strip=True) if value_tag else None
+
+        if not label or not value:
+            continue
+
+        if "미세먼지" in label and "초미세먼지" not in label:
+            pm10_text = value
+        elif "초미세먼지" in label:
+            pm25_text = value
+
+    if pm10_text is not None and pm25_text is not None:
+        return f"미세먼지 {pm10_text}, 초미세먼지 {pm25_text}"
+    return None
+
+
+def get_current_weather(location: str):
+    url = "https://search.naver.com/search.naver?query=" + urllib.parse.quote(f"{location} 날씨")
+    headers = {"User-Agent": USER_AGENT, "Accept-Language": "ko-KR,ko;q=0.9"}
+    res = requests.get(url, headers=headers, timeout=5)
+    soup = BeautifulSoup(res.text, "html.parser")
+    with open("weather_debug.html", "w", encoding="utf-8") as f:
+        f.write(soup.prettify())
+
+    # 현재 온도
+    temp_span = soup.find("span", string=re.compile("현재 온도"))
+    current_temp = temp_span.next_sibling.strip() if temp_span else None
+
+    # 체감 온도
     dt_feel = soup.find("dt", string=re.compile("체감"))
     feel_dd = dt_feel.find_next_sibling("dd") if dt_feel else None
     perceived = feel_dd.get_text(strip=True) if feel_dd else None
 
-    if current_temp and perceived:
-        return f"{location}의 현재 기온은 {current_temp}이며, 체감 온도는 {perceived}입니다."
-    return None
+    # 하늘 상태
+    sky_span = soup.select_one("i.wt_icon span.blind")
+    sky = sky_span.get_text(strip=True) if sky_span else None
+
+    # 공기질
+    air_quality = extract_air_quality(soup)
+    if air_quality is None:
+        air_quality = "정보 없음"
+
+    summary = f"{location}의 현재 기온은 {current_temp}이며, 체감 온도는 {perceived}입니다."
+    if sky:
+        summary += f" 하늘 상태는 '{sky}'입니다."
+    if air_quality:
+        summary += f" 공기질 정보: {air_quality}"
+
+    return {
+        "location": location or "대한민국",
+        "current_temp": current_temp,
+        "perceived_temp": perceived,
+        "sky": sky,
+        "air_quality": air_quality,
+        "summary": summary
+    }
 
 
 def get_forecast_weather(location: str, day_offset: int) -> str | None:
