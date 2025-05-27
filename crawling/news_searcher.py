@@ -243,12 +243,13 @@ async def _fetch_for_keyword(
         items = []
 
     # 5) 날짜 필터링
-    if date_offset is not None:
+    if date_offset is not None and all(t not in TIME_KEYWORDS for t in tokens):
         target = (datetime.now() - timedelta(days=date_offset)).date()
         items = [
             it for it in items
             if datetime.strptime(it.get("pubDate", ""), "%a, %d %b %Y %H:%M:%S %z").date() == target
         ]
+
     print(f"🧪 refined query: {pattern}")
     print(f"🔗 request URL: {urls_to_try}")
 
