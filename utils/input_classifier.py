@@ -15,8 +15,7 @@ def classify_user_input(text: str) -> str:
 
     news_keywords = [
         "뉴스", "속보", "기사", "보도", "이슈", "소식", "정보",
-        "알려줘", "뉴스 알려줘", "기사 읽어줘", "소식 전해줘", "헤드라인",
-        "최신 소식", "사건", "사고", "정치", "경제", "사회", "문화",
+        "헤드라인", "최신 소식", "사건", "사고", "정치", "경제", "사회", "문화",
         "스포츠", "국제", "사건사고", "사망", "사고 발생", "정책", "공약",
         "주가", "증시", "부동산", "대통령", "선거", "투표", "전쟁",
         "갈등", "시위", "집회", "데모", "환경", "오염", "미세먼지",
@@ -36,12 +35,21 @@ def classify_user_input(text: str) -> str:
         "심심해", "지루해", "놀아줘", "외로워", "한마디 해줘"
     ]
 
-    if any(kw in text for kw in story_keywords):
-        return "story"
-    if any(kw in text for kw in weather_keywords):
-        return "weather"
+    # 1. 뉴스 우선
     if any(kw in text for kw in news_keywords):
         return "news"
+    
+    # 2. 날씨
+    if any(kw in text for kw in weather_keywords):
+        return "weather"
+
+    # 3. 이야기 (단, 너무 일반적인 "말해줘", "들려줘"는 단독으로 막는다)
+    story_only_keywords = [kw for kw in story_keywords if kw not in ["말해줘", "들려줘"]]
+    if any(kw in text for kw in story_only_keywords):
+        return "story"
+
+    # 4. "말해줘", "들려줘" 단독일 경우 → story 아닌 invalid로 처리
+    if re.fullmatch(r"(.*\s)?(말해줘|들려줘)\s*", text):
+        return "invalid"
+
     return "invalid"
-
-

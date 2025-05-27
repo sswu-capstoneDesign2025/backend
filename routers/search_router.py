@@ -8,6 +8,7 @@ from utils.keyword_extractor import extract_keyword_from_text
 from utils.text_processor import summarize_article_pipeline, combine_summaries_into_story
 from crawling.weather_fetcher import get_weather
 from utils.time_parser import parse_korean_time_expr
+from crawling.rank_news import fetch_naver_trending_news
 
 router = APIRouter()
 
@@ -79,6 +80,26 @@ async def search_news_urls(user_request: UserRequest):
         }
 
     # 뉴스 검색
+    # "오늘 인기" 요청은 랭킹 크롤링으로 처리
+    if set(keywords) & {"오늘", "인기"}:
+        raw_articles = fetch_naver_trending_news(limit=3)
+        summaries = []
+
+        for article in raw_articles:
+            content = get_article_content(article["url"])
+            if not content:
+                continue
+            summary = summarize_article_pipeline(content, text)
+            summaries.append({"url": article["url"], "summary": summary})
+
+        combined_story = combine_summaries_into_story([s["summary"] for s in summaries])
+        return {
+            "keywords": keywords,
+            "summaries": summaries,
+            "combined_summary": f"오늘 많이 본 뉴스 {len(summaries)}건을 알려드릴게요.\n{combined_story}"
+        }
+
+    # 일반 뉴스 검색 처리
     news_results = await search_news_by_keywords(keywords)
     result_dict = {"keywords": keywords, "results": news_results}
 
