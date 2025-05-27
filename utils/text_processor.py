@@ -1,21 +1,32 @@
 import openai
 import os
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 import re
+import pickle
 
 from utils.keyword_extractor import (
     extract_keyword_from_text,
     extract_passages_by_keywords
 )
 
+CACHE_PATH = "summary_cache.pkl"
+SUMMARY_CACHE = {}
+# 서버 시작 시 캐시 로드
+if os.path.exists(CACHE_PATH):
+    try:
+        with open(CACHE_PATH, "rb") as f:
+            SUMMARY_CACHE = pickle.load(f)
+        print(f"📂 캐시 로드 완료: {len(SUMMARY_CACHE)}개")
+    except Exception as e:
+        print(f"❗ 캐시 로드 실패: {e}")
+
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
-client = OpenAI()
+client = AsyncOpenAI()
 
-
-def long_article_summary(text: str) -> str:
+async def long_article_summary(text: str) -> str:
     """
     1차 요약: GPT-3.5-turbo 로 긴 본문을 압축해서 500~700자 이내로 줄여줌
     """
@@ -29,8 +40,8 @@ def long_article_summary(text: str) -> str:
     [출력 형식]
     - 요약:
     """
-    resp = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+    resp = await client.chat.completions.create(
+        model="gpt-3.5-turbo-0125",
         messages=[
             {"role": "system", "content": "너는 뉴스 요약 전문가야."},
             {"role": "user", "content": prompt}
@@ -43,8 +54,7 @@ def long_article_summary(text: str) -> str:
     return m.group(1).strip() if m else out.strip()
 
 
-
-def simplify_for_borderline(text: str) -> str:
+async def simplify_for_borderline(text: str) -> str:
     """
     2차 다듬기: 
     - 경계선 지능 수준 사용자도 이해할 수 있도록
@@ -66,8 +76,8 @@ def simplify_for_borderline(text: str) -> str:
     [출력 형식]
     - 간단한 요약:
     """
-    resp = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+    resp = await client.chat.completions.create(
+        model="gpt-3.5-turbo-0125",
         messages=[
             {"role": "system", "content": "너는 어린이용 뉴스 편집자야."},
             {"role": "user", "content": prompt}
@@ -80,24 +90,31 @@ def simplify_for_borderline(text: str) -> str:
     return m.group(1).strip() if m else out.strip()
 
 
-def summarize_article_pipeline(
-    text: str,
-    user_query: str,
-    window: int = 1
-) -> str:
+async def summarize_article_pipeline(url: str, text: str, user_query: str, window: int = 1) -> str:
     """
     1) user_query에서 핵심 키워드 추출
     2) 기사 본문에서 키워드 주변 문장만 필터링
     3) GPT-3.5로 압축 요약 → 어린이용으로 쉬운 문장으로 변환
+    + 캐시 적용
     """
+    cache_key = f"{url}|{user_query}"
+    if cache_key in SUMMARY_CACHE:
+        return SUMMARY_CACHE[cache_key]
+
     keywords = extract_keyword_from_text(user_query)
     filtered = extract_passages_by_keywords(text, keywords, window=window)
-    short = long_article_summary(filtered)
-    return simplify_for_borderline(short)
+
+    short = await long_article_summary(filtered)            
+    simplified = await simplify_for_borderline(short)      
+
+    SUMMARY_CACHE[cache_key] = simplified
+    with open(CACHE_PATH, "wb") as f:
+        pickle.dump(SUMMARY_CACHE, f)
+
+    return simplified
 
 
-
-def combine_summaries_into_story(summaries: list[str]) -> str:
+async def combine_summaries_into_story(summaries: list[str]) -> str:
     """
     여러 요약을 하나로 묶은 뒤, 
     경계선 지능 수준의 사용자도 이해할 수 있게 쉽고 명확하게 정리
@@ -117,8 +134,8 @@ def combine_summaries_into_story(summaries: list[str]) -> str:
     [출력 형식]
     - 쉬운 뉴스:
     """
-    resp = client.chat.completions.create(
-        model="gpt-4-turbo",
+    resp = await client.chat.completions.create(
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": "너는 어린이용 뉴스 편집자야."},
             {"role": "user", "content": prompt}

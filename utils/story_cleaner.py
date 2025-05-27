@@ -17,7 +17,7 @@ def clean_user_story(raw_text: str) -> str:
 \"\"\"{raw_text}\"\"\"
 """
     response = openai.ChatCompletion.create(
-        model="gpt-3.5",
+        model="gpt-3.5-turbo-0125",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7
     )
