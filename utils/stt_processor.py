@@ -30,14 +30,19 @@ def transcribe_audio_from_url(file_url: str) -> str:
         "X-CLOVASPEECH-API-KEY": HEADER_SECRET,
     }
 
+    params = {
+        "language": "ko-KR",
+        "completion": "sync",
+        "fullText": True,
+        "wordAlignment": True,
+        "diarization": {
+            "enable": False  # 👈 추가!
+        }
+    }
+
     files = {
         "media": open(local_path, "rb"),
-        "params": (None, json.dumps({
-            "language": "ko-KR",
-            "completion": "sync",
-            "fullText": True,
-            "wordAlignment": True,
-        }), "application/json"),
+        "params": (None, json.dumps(params), "application/json"),
     }
 
     response = requests.post(invoke_url, headers=headers, files=files)
@@ -46,6 +51,6 @@ def transcribe_audio_from_url(file_url: str) -> str:
         result = response.json()
         if result.get("result") not in ("SUCCESS", "COMPLETED"):
             raise Exception(f"❌ CLOVA 응답 실패: {result}")
-
-        # 성공 시 텍스트 추출
         return result.get("text", "")
+    else:
+        raise Exception(f"STT 실패: {response.status_code}: {response.text}")
