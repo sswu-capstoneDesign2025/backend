@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from models import Base, ProcessedText, SummaryNote, OtherUserRecord
 from database import SessionLocal, engine
-from routers import search_router, stt_router, story_router, otherstory_router, auth_router, weather_router
+from routers import search_router, stt_router, story_router, otherstory_router, auth_router, weather_router, tts_router
 from routers.user_alert_router import router as user_alert_router
 from dotenv import load_dotenv
 import logging
@@ -58,6 +58,7 @@ app.include_router(auth_router.router)
 app.include_router(user_alert_router)
 app.include_router(processing_router)
 app.include_router(weather_router.router)
+app.include_router(tts_router.router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
