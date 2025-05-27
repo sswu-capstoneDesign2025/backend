@@ -6,7 +6,7 @@ from google.cloud import texttospeech
 from dotenv import load_dotenv
 load_dotenv()
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "gcp-key.json"
 
 OUTPUT_DIR = "./static/tts"
 VOICE_NAME = "ko-KR-Standard-A"
