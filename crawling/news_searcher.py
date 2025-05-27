@@ -257,7 +257,7 @@ async def _fetch_for_keyword(
 
 async def search_news_by_keywords(
     keywords: list[str],
-    max_per_keyword: int = 3
+    max_per_keyword: int = 6
 ) -> dict[str, list[str]]:
     """
     비동기 httpx.AsyncClient + asyncio.gather로
