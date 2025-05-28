@@ -94,9 +94,7 @@ async def search_news_urls(user_request: UserRequest):
             "keywords": keywords,
             "Detailed articles": [{"url": url} for url, _ in url_text_pairs],
             "summaries": summaries,
-            "combined_summary":
-                f"오늘 많이 본 뉴스 {len(summaries)}건을 알려드릴게요.\n" +
-                proc["combined"]
+            "combined_summary": "오늘 많이 본 뉴스를 요약해서 알려드릴게요.\n" + proc["combined"]
         }
 
 
