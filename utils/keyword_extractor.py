@@ -57,15 +57,8 @@ def extract_keyword_from_text(text: str, top_n: int = 3) -> list[str]:
     for domain, vocab in DOMAIN_VOCABULARY.items():
         # 토큰 중에 도메인 어휘가 하나라도 있으면 ‘감지’로 간주
         if any(tok in vocab for tok in tokens):
-            specific = [tok for tok in tokens if tok in vocab]
-            # 나머지 사전 키워드 중에서 부족분만 채움
-            remainder = [kw for kw in vocab if kw not in specific]
-            result = specific.copy()
-            for kw in remainder:
-                if len(result) >= top_n:
-                    break
-                result.append(kw)
-            return result[:top_n]
+            specific = [tok for tok in tokens if tok in vocab and any(tok in seg for seg in text.split())]
+            return specific[:top_n] if specific else [tokens[0]]
 
     # 4) n-gram 기반 추출 (띄어쓰기 유지)
     phrase_scores = Counter()

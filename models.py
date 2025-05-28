@@ -47,7 +47,8 @@ class OtherUserRecord(Base):
     content = Column(String, nullable=False)
     author = Column(String, nullable=False)
     profileUrl = Column(String, nullable=True)
-
+    region = Column(String, nullable=True)
+    topic = Column(String, nullable=True)  
     
 class UserHealthAlert(Base):
     __tablename__ = "user_health_alerts"

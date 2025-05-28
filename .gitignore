@@ -14,5 +14,6 @@ venv/
 processed_texts.db
 .venv/
 gcp-key.json
+summary_cache.pkl
 
 static/

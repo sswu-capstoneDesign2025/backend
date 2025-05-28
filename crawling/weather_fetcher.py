@@ -17,6 +17,29 @@ def _get_soup(location: str) -> BeautifulSoup:
     resp.raise_for_status()
     return BeautifulSoup(resp.text, "html.parser")
 
+def normalize_location_name(location: str) -> str:
+    """
+    ex) 동선동 이가 → 동선동2가, 동선동 삼가 → 동선동3가 등으로 자동 변환
+    """
+    # 한글 수사(숫자)를 대응되는 아라비아 숫자로 매핑
+    native_to_digit = {
+        "일": "1", "이": "2", "삼": "3", "사": "4", "오": "5",
+        "육": "6", "칠": "7", "팔": "8", "구": "9", "십": "10"
+    }
+
+    # "XXX동 [일이삼...]가" → "XXX동[1~10]가"
+    pattern = re.compile(r"(?P<dong>\w+동)\s*(?P<native>[일이삼사오육칠팔구십])가")
+
+    def replacer(match):
+        dong = match.group("dong")
+        native = match.group("native")
+        digit = native_to_digit.get(native)
+        if digit:
+            return f"{dong}{digit}가"
+        return match.group(0)  # 치환 불가능한 경우 그대로 반환
+
+    return pattern.sub(replacer, location)
+
 def extract_air_quality(soup):
     pm10_text, pm25_text = None, None
     items = soup.select("ul.today_chart_list li.item_today")
@@ -43,12 +66,12 @@ def extract_air_quality(soup):
 
 
 def get_current_weather(location: str):
+    location = normalize_location_name(location)
+
     url = "https://search.naver.com/search.naver?query=" + urllib.parse.quote(f"{location} 날씨")
     headers = {"User-Agent": USER_AGENT, "Accept-Language": "ko-KR,ko;q=0.9"}
     res = requests.get(url, headers=headers, timeout=5)
     soup = BeautifulSoup(res.text, "html.parser")
-    with open("weather_debug.html", "w", encoding="utf-8") as f:
-        f.write(soup.prettify())
 
     # 현재 온도
     temp_span = soup.find("span", string=re.compile("현재 온도"))
@@ -88,6 +111,7 @@ def get_forecast_weather(location: str, day_offset: int) -> str | None:
     """
     day_offset=1 → 내일, 2 → 모레
     """
+    location = normalize_location_name(location)
     soup = _get_soup(location)
     items = soup.select(
         "div.api_subject_bx._weekly_weather_wrap "
@@ -124,6 +148,7 @@ def get_weekly_weather(location: str) -> str:
     """
     이번 주 전체 예보
     """
+    location = normalize_location_name(location)
     soup = _get_soup(location)
     items = soup.select(
         "div.api_subject_bx._weekly_weather_wrap "
@@ -159,13 +184,15 @@ def get_weekly_weather(location: str) -> str:
 
 
 def get_monthly_weather(location: str) -> str:
+    location = normalize_location_name(location)
     # 아직 구현되지 않은 기능
     return f"{location} 월간 예보 기능은 아직 구현되지 않았습니다."
 
 
 def get_weather(location: str, when: str = "오늘", offset: int = None) -> str:
     if when == "오늘":
-        text = get_current_weather(location)
+        data = get_current_weather(location)
+        text = data.get("summary", f"{location}의 날씨 정보를 불러오지 못했습니다.")
     elif when in ("내일", "모레", "글피", "n일후"):
         day_offset = offset if offset is not None else (1 if when=="내일" else 2 if when=="모레" else 3)
         text = get_forecast_weather(location, day_offset)
