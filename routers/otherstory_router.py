@@ -21,6 +21,8 @@ class OtherUserRecordCreate(BaseModel):
     title: str
     content: str
     author: str
+    region: str | None = None     
+    topic: str | None = None      
     profileUrl: str | None = None
 
 @router.post("/other-user-records/")
@@ -29,7 +31,9 @@ def create_other_user_record(record: OtherUserRecordCreate, db: Session = Depend
         title=record.title,
         content=record.content,
         author=record.author,
-        profileUrl=record.profileUrl
+        profileUrl=record.profileUrl,
+        region=record.region,   
+        topic=record.topic       
     )
     db.add(db_record)
     db.commit()
@@ -42,6 +46,8 @@ def create_other_user_record(record: OtherUserRecordCreate, db: Session = Depend
             "title": db_record.title,
             "content": db_record.content,
             "author": db_record.author,
+            "region": db_record.region,
+            "topic": db_record.topic,
             "profileUrl": db_record.profileUrl or "https://i.pravatar.cc/150?img=1"
         }
     }
@@ -55,6 +61,8 @@ def get_other_user_records(db: Session = Depends(get_db)):
             "title": r.title,
             "content": r.content,
             "author": r.author,
+            "region": r.region,
+            "topic": r.topic,
             "profileUrl": r.profileUrl
         } for r in records
     ]

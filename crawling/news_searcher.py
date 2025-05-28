@@ -118,10 +118,9 @@ def refine_keyword_for_search(keyword: str) -> str:
     - 키워드 종류(인물, 사건, 지역, 경제 등)에 따라 다른 패턴 적용
     """
     person_patterns = [
-        f"{keyword} 발언",
-        f"{keyword} 인터뷰",
         f"{keyword} 관련 기사",
-        f"{keyword} 최근 행보"
+        f"{keyword} 기사",
+        f"{keyword} 뉴스"
     ]
     location_patterns = [
         f"{keyword} 지역 뉴스",
@@ -146,7 +145,6 @@ def refine_keyword_for_search(keyword: str) -> str:
         f"{keyword} 최신 뉴스",
         f"{keyword} 관련 이슈",
         f"{keyword} 최신 소식",
-        f"{keyword} 이슈 정리"
     ]
 
     if keyword in person_keywords or '대통령' in keyword:

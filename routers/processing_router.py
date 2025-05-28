@@ -12,10 +12,12 @@ from sqlalchemy.orm import Session
 import time
 from utils.stt_processor import transcribe_audio_from_url
 from utils.input_classifier import classify_user_input
-from utils.story_cleaner import clean_user_story
+from utils.story_cleaner import process_user_story
 from database import SessionLocal
 from models import SummaryNote
 from routers.search_router import search_news_urls, UserRequest
+from crawling.weather_fetcher import get_current_weather, get_weather, normalize_location_name
+from crawling.news_searcher import expand_location
 
 router = APIRouter(prefix="/process", tags=["Audio Processing"])
 
@@ -65,14 +67,15 @@ async def process_audio(
         if not username:
             raise HTTPException(400, "Username is required to save story")
         try:
-            cleaned = clean_user_story(text)
+            story_data = process_user_story(text)
+            cleaned = story_data["cleaned_story"] 
         except Exception as e:
             raise HTTPException(500, f"스토리 클리닝 실패: {e}")
         db: Session = next(get_db())
         note = SummaryNote(
             sum_title="사용자 이야기",
-            content=cleaned,
-            username=username  
+            content=cleaned, 
+            username=username
         )
         db.add(note); db.commit(); db.refresh(note)
         return {
@@ -106,53 +109,151 @@ async def process_audio(
     if input_type == "story":
         if session_state == "initial":
             if re.search(r"내가.*(이야기|얘기)", text):
+                response_text = "그래, 어떤 이야기야?"
+                tts_url = await get_tts_audio_url(response_text)
                 return {
                     "type": "story",
                     "transcribed_text": text,
-                    "response": "그래, 어떤 이야기야?",
+                    "response": response_text,
+                    "response_audio_url": tts_url,
                     "next_state": "awaiting_story"
                 }
+
+            response_text = "너가 재밌는 얘기해줄래? 아니면 내가 해줄까?"
+            tts_url = await get_tts_audio_url(response_text)
             return {
                 "type": "story",
                 "transcribed_text": text,
-                "response": "너가 재밌는 얘기해줄래? 아니면 내가 해줄까?",
+                "response": response_text,
+                "response_audio_url": tts_url,
                 "next_state": "awaiting_choice"
             }
 
         if session_state == "awaiting_choice":
+            normalized_text = re.sub(r"[^\w\s]", "", text).strip()
+
             user_offer_patterns = r"(내가\s*(할게|해볼게|할래|한다고|얘기해줄게|얘기할게|이야기할게|시작할게|말할게|말해줄게|말할래|얘기해볼게|얘기할래|이야기해볼게|이야기할래|해줄게|할게요|해볼게요|하겠어))"
             story_request_patterns = r"(너[가는]?\s*)?(해줘|얘기(해)?줘|이야기(해)?줘|말(해)?줘|들려줘|재밌는 얘기\s*해줘|얘기\s*좀\s*해줘|뭐\s*재밌는\s*얘기\s*없어)"
-            if re.search(user_offer_patterns, text):
+
+            if re.search(user_offer_patterns, normalized_text):
+                response_text = "그래, 어떤 이야기야?"
+                tts_url = await get_tts_audio_url(response_text)
                 return {
                     "type": "story",
                     "transcribed_text": text,
-                    "response": "그래, 어떤 이야기야?",
+                    "response": response_text,
+                    "response_audio_url": tts_url,
                     "next_state": "awaiting_story"
                 }
+            
             elif re.search(story_request_patterns, text):
+                from random import choice
+                import requests
+
+                r = requests.get("http://localhost:8000/other-user-records/")
+                stories = r.json()
+                if stories:
+                    selected = choice(stories)
+                    response_text = f"그럼 내가 해줄게! {selected['title']}... {selected['content']}"
+                    tts_url = await get_tts_audio_url(response_text)
+                    return {
+                        "type": "story",
+                        "response": response_text,
+                        "response_audio_url": tts_url,
+                        "next_state": "complete"
+                    }
+                
+                response_text = "아직 들려줄 이야기가 없어. 너가 하나 말해줄래?"
+                tts_url = await get_tts_audio_url(response_text)
                 return {
                     "type": "story",
-                    "response": "그럼 내가 해줄게! 오늘의 이야기는…",
-                    "next_state": "complete"
+                    "response": response_text,
+                    "response_audio_url": tts_url,
+                    "next_state": "awaiting_choice"
                 }
 
+        if session_state == "awaiting_story":
+            if not username:
+                raise HTTPException(400, "Username is required to save story")
+
+            try:
+                story_data = process_user_story(text)
+            except Exception as e:
+                raise HTTPException(500, f"GPT 처리 실패: {e}")
+
+            cleaned = story_data['cleaned_story']
+            region = story_data.get('region', '없음')
+            topic = story_data.get('topic', '기타')
+
+            # DB 저장
+            import requests
+            res = requests.post("http://localhost:8000/other-user-records/", json={
+                "title": f"[{region}] {topic} 이야기",
+                "content": cleaned,
+                "author": username,
+                "region": region,
+                "topic": topic
+            })
+            if res.status_code != 200:
+                raise HTTPException(500, f"DB 저장 실패: {res.text}")
+
+            response_text = "좋은 이야기 고마워! 잘 저장해둘게."
+            tts_url = await get_tts_audio_url(response_text)
+
+            return {
+                "type": "story",
+                "response": response_text,
+                "response_audio_url": tts_url,
+                "next_state": "complete"
+            }    
         return {
             "type": "story",
             "response": "알 수 없는 상태입니다.",
             "next_state": "initial"
         }
 
+
+
     if input_type == "weather":
-        weather_summary = await search_news_urls(UserRequest(request_text=text))
         try:
-            summary_text = weather_summary["summaries"][0]["summary"]["summary"]
+            # 1. 지역 추출
+            location_parts = expand_location(text)
+            full_location = " ".join(reversed(location_parts[:-1])) if len(location_parts) > 1 else "대한민국"
+            full_location = normalize_location_name(full_location)
+            full_location = clean_location_name(full_location)
+            print(f"🧭 날씨 지역 추출 결과: {full_location}")
+
+            # 2. 시점 추론
+            lowered = text.lower()
+            when = "오늘"
+            if "내일" in lowered:
+                when = "내일"
+            elif "모레" in lowered:
+                when = "모레"
+            elif "이번주" in lowered or "이번 주" in lowered:
+                when = "이번주"
+            elif "다음주" in lowered or "다음 주" in lowered:
+                when = "다음주"
+            elif "이번달" in lowered or "이번 달" in lowered:
+                when = "이번달"
+            elif "다음달" in lowered or "다음 달" in lowered:
+                when = "다음달"
+
+            # 3. 요약 문자열 얻기
+            summary_text = get_weather(full_location, when=when)
         except Exception as e:
-            raise HTTPException(500, f"날씨 요약 텍스트 추출 실패: {e}")
+            raise HTTPException(500, f"날씨 정보 수집 실패: {e}")
+
+        # 4. TTS 생성
         tts_url = await get_tts_audio_url(summary_text)
         return {
             "type": "weather",
             "transcribed_text": text,
-            "response": weather_summary,
+            "response": {
+                "location": full_location,
+                "when": when,
+                "summary": summary_text
+            },
             "response_text": summary_text,
             "response_audio_url": tts_url,
             "next_state": "initial"
@@ -190,3 +291,25 @@ async def get_tts_audio_url(text: str) -> str:
         if response.status_code != 200:
             raise Exception(f"TTS 요청 실패: {response.text}")
         return response.json()["file_url"]
+    
+
+def clean_location_name(text: str) -> str:
+    """
+    '동선동2가 날씨 알려줘' → '동선동2가' 같은 실질적 지역명만 추출
+    """
+    # 날씨 앞까지 자르기
+    if "날씨" in text:
+        text = text.split("날씨")[0].strip()
+    
+    # 숫자+가 대응 (동선동2가 등), 또는 '동 + 한글숫자 + 가'
+    # 예: 동선동 이가 → 동선동2가 로 normalize된 상태 기준
+    match = re.search(r"(\w+동\s*\d*가?)", text)
+    if match:
+        return match.group(1).strip()
+    
+    # 그냥 마지막 '동'까지 자르기
+    match = re.search(r"(\w+동)", text)
+    if match:
+        return match.group(1).strip()
+    
+    return text.strip()  # fallback
