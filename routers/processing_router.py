@@ -3,21 +3,18 @@
 
 import os
 import uuid
-import asyncio
 import re
 import httpx
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import time
 from utils.stt_processor import transcribe_audio_from_url
-from utils.input_classifier import classify_user_input
-from utils.story_cleaner import process_user_story
 from database import SessionLocal
-from models import SummaryNote
 from routers.search_router import search_news_urls, UserRequest
-from crawling.weather_fetcher import get_current_weather, get_weather, normalize_location_name
+from crawling.weather_fetcher import get_weather, normalize_location_name
 from crawling.news_searcher import expand_location
+from utils.story_handler import handle_story_interaction
+
 
 router = APIRouter(prefix="/process", tags=["Audio Processing"])
 
@@ -30,6 +27,21 @@ def get_db():
         yield db
     finally:
         db.close()
+
+async def classify_with_model(text: str) -> str:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post("http://localhost:8000/classify", json={"text": text})
+            if response.status_code == 200:
+                data = response.json()
+                label = data.get("label", "")
+                confidence = data.get("confidence", 0)
+                if label in ["이야기", "뉴스", "날씨"] and confidence > 0.5:
+                    return {"이야기": "story", "뉴스": "news", "날씨": "weather"}[label]
+        except Exception as e:
+            print(f"❌ 입력 분류 API 실패: {e}")
+    return "invalid"
+
 
 @router.post("/audio/")
 async def process_audio(
@@ -63,31 +75,10 @@ async def process_audio(
         raise HTTPException(500, f"STT 실패: {e}")
     print(f"🗣️ [STT 완료] 텍스트: {text[:20]}... / 시간: {time.time() - start:.2f}s")
 
-    if session_state == "awaiting_story":
-        if not username:
-            raise HTTPException(400, "Username is required to save story")
-        try:
-            story_data = process_user_story(text)
-            cleaned = story_data["cleaned_story"] 
-        except Exception as e:
-            raise HTTPException(500, f"스토리 클리닝 실패: {e}")
-        db: Session = next(get_db())
-        note = SummaryNote(
-            sum_title="사용자 이야기",
-            content=cleaned, 
-            username=username
-        )
-        db.add(note); db.commit(); db.refresh(note)
-        return {
-            "type": "story",
-            "transcribed_text": text,
-            "response": "고마워, 이야기 잘 들었어!",
-            "next_state": "complete"
-        }
 
     # 3. 분류 (story / news / weather)
     start = time.time()
-    input_type = classify_user_input(text)
+    input_type = await classify_with_model(text)
     print(f"📦 [입력 분류] → {input_type} / 시간: {time.time() - start:.2f}s")
 
     if input_type not in ["story", "news", "weather"]:
@@ -107,111 +98,10 @@ async def process_audio(
 
     # 4. 분기 처리
     if input_type == "story":
-        if session_state == "initial":
-            if re.search(r"내가.*(이야기|얘기)", text):
-                response_text = "그래, 어떤 이야기야?"
-                tts_url = await get_tts_audio_url(response_text)
-                return {
-                    "type": "story",
-                    "transcribed_text": text,
-                    "response": response_text,
-                    "response_audio_url": tts_url,
-                    "next_state": "awaiting_story"
-                }
-
-            response_text = "너가 재밌는 얘기해줄래? 아니면 내가 해줄까?"
-            tts_url = await get_tts_audio_url(response_text)
-            return {
-                "type": "story",
-                "transcribed_text": text,
-                "response": response_text,
-                "response_audio_url": tts_url,
-                "next_state": "awaiting_choice"
-            }
-
-        if session_state == "awaiting_choice":
-            normalized_text = re.sub(r"[^\w\s]", "", text).strip()
-
-            user_offer_patterns = r"(내가\s*(할게|해볼게|할래|한다고|얘기해줄게|얘기할게|이야기할게|시작할게|말할게|말해줄게|말할래|얘기해볼게|얘기할래|이야기해볼게|이야기할래|해줄게|할게요|해볼게요|하겠어))"
-            story_request_patterns = r"(너[가는]?\s*)?(해줘|얘기(해)?줘|이야기(해)?줘|말(해)?줘|들려줘|재밌는 얘기\s*해줘|얘기\s*좀\s*해줘|뭐\s*재밌는\s*얘기\s*없어)"
-
-            if re.search(user_offer_patterns, normalized_text):
-                response_text = "그래, 어떤 이야기야?"
-                tts_url = await get_tts_audio_url(response_text)
-                return {
-                    "type": "story",
-                    "transcribed_text": text,
-                    "response": response_text,
-                    "response_audio_url": tts_url,
-                    "next_state": "awaiting_story"
-                }
-            
-            elif re.search(story_request_patterns, text):
-                from random import choice
-                import requests
-
-                r = requests.get("http://localhost:8000/other-user-records/")
-                stories = r.json()
-                if stories:
-                    selected = choice(stories)
-                    response_text = f"그럼 내가 해줄게! {selected['title']}... {selected['content']}"
-                    tts_url = await get_tts_audio_url(response_text)
-                    return {
-                        "type": "story",
-                        "response": response_text,
-                        "response_audio_url": tts_url,
-                        "next_state": "complete"
-                    }
-                
-                response_text = "아직 들려줄 이야기가 없어. 너가 하나 말해줄래?"
-                tts_url = await get_tts_audio_url(response_text)
-                return {
-                    "type": "story",
-                    "response": response_text,
-                    "response_audio_url": tts_url,
-                    "next_state": "awaiting_choice"
-                }
-
-        if session_state == "awaiting_story":
-            if not username:
-                raise HTTPException(400, "Username is required to save story")
-
-            try:
-                story_data = process_user_story(text)
-            except Exception as e:
-                raise HTTPException(500, f"GPT 처리 실패: {e}")
-
-            cleaned = story_data['cleaned_story']
-            region = story_data.get('region', '없음')
-            topic = story_data.get('topic', '기타')
-
-            # DB 저장
-            import requests
-            res = requests.post("http://localhost:8000/other-user-records/", json={
-                "title": f"[{region}] {topic} 이야기",
-                "content": cleaned,
-                "author": username,
-                "region": region,
-                "topic": topic
-            })
-            if res.status_code != 200:
-                raise HTTPException(500, f"DB 저장 실패: {res.text}")
-
-            response_text = "좋은 이야기 고마워! 잘 저장해둘게."
-            tts_url = await get_tts_audio_url(response_text)
-
-            return {
-                "type": "story",
-                "response": response_text,
-                "response_audio_url": tts_url,
-                "next_state": "complete"
-            }    
-        return {
-            "type": "story",
-            "response": "알 수 없는 상태입니다.",
-            "next_state": "initial"
-        }
-
+        result = await handle_story_interaction(text, session_state, username)
+        if result is not None:
+            result["transcribed_text"] = text
+            return result
 
 
     if input_type == "weather":

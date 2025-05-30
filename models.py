@@ -36,6 +36,8 @@ class SummaryNote(Base):
     sum_title = Column(String, nullable=False)
     content = Column(String, nullable=False)
     username = Column(String, nullable=True)
+    topic = Column(String, nullable=True)     
+    region = Column(String, nullable=True)     
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class OtherUserRecord(Base):

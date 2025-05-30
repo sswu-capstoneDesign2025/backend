@@ -1,12 +1,14 @@
+# routers\tts_router.py
 import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
 from google.cloud import texttospeech
+import httpx
 from dotenv import load_dotenv
 load_dotenv()
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "gcp-key.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
 OUTPUT_DIR = "./static/tts"
 VOICE_NAME = "ko-KR-Standard-A"
@@ -65,3 +67,11 @@ async def synthesize_tts(request: TTSRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"TTS 처리 실패: {e}")
+
+
+async def get_tts_audio_url(text: str) -> str:
+    async with httpx.AsyncClient() as client:
+        response = await client.post("http://localhost:8000/tts/synthesize", json={"text": text})
+        if response.status_code != 200:
+            raise Exception(f"TTS 요청 실패: {response.text}")
+        return response.json()["file_url"]

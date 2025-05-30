@@ -55,6 +55,8 @@ pyppeteer==2.0.0
 pyquery==2.0.1
 PySocks==1.7.1
 python-dotenv==1.1.0
+python-jose==3.4.0
+python-multipart==0.0.20
 requests==2.32.3
 requests-html==0.10.0
 rsa==4.9.1
