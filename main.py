@@ -61,5 +61,6 @@ app.include_router(weather_router.router)
 app.include_router(tts_router.router)
 app.include_router(input_router.router)
 
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
