@@ -12,3 +12,9 @@ venv/
 .idea/
 *.db
 processed_texts.db
+.venv/
+gcp-key.json
+summary_cache.pkl
+
+static/
+best_model/model.safetensors
