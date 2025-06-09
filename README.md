@@ -1,133 +1,103 @@
+# 🧓 말벗: 음성 기반 소통 & 건강 케어 앱
 
-```markdown
-# 📰 News & Text Processing API Project
+이 프로젝트는 **독거노인과 경계성 지능인**을 위한 음성 인식 기반 소통 및 건강 알림 앱입니다.  
+사용자의 음성을 실시간으로 인식하여 **뉴스 요청**, **날씨 요청**, **이야기 공유** 등 의도를 파악하고,  
+해당 카테고리에 맞는 정보를 제공합니다.
 
-Welcome to the News & Text Processing API!  
-This project provides a FastAPI-based server that processes user texts and news articles by:
-- Converting to standard Korean
-- Removing slang and inappropriate language
-- Summarizing into simple, easy-to-understand language
+또한 사용자 맞춤형 **건강 알람 기능**을 통해 특정 시간에 복약, 스트레칭, 건강 활동을 알림으로 제공합니다.
 
 ---
-## 🌟 Features
 
-✅ **JSON File Text Processing**  
-- Input arbitrary text.
-- Standardize Korean.
-- Remove profanity and inappropriate expressions.
-- Extract key points.
+## 🌟 주요 기능
 
-✅ **News Article Processing**  
-- Crawl news article content via URL.
-- Standardize and simplify language for better accessibility.
-- Summarize into simple sentences suitable for general audiences.
+### 🎙 음성 인식 기반 서비스
+사용자의 음성을 텍스트로 변환하고, 이를 분류하여 해당 요청을 처리합니다.
 
-✅ **Data Persistence**  
-- All processed texts are saved in a SQLite database for future retrieval and analysis.
+예:
+- `"오늘 날씨 어때?"` → `날씨 요청`
+- `"요즘 정치 뉴스 알려줘"` → `뉴스 요청`
+- `"오늘 이런 일이 있었어"` → `이야기`
 
----
-## 🏗️ Project Structure
+### 📰 뉴스 응답
+- 사용자의 키워드를 기반으로 **실시간 뉴스**를 크롤링
+- 뉴스 내용을 **간단한 요약문**으로 응답
 
-```
-/project-root
-│
-├── main.py             # FastAPI server (API endpoints)
-├── models.py           # SQLAlchemy ORM models (ProcessedText table)
-├── database.py         # Database connection management
-├── requirements.txt    # Dependency list
-├── /crawling
-│   ├── newscrawling.py  # News crawling module
-│   └── keyword.py       # Keyword extraction module
-├── /utils
-│   └── text_processor.py  # GPT-powered text refinement and summarization
-├── .env                # Environment variables (OpenAI API Key)
-└── README.md           # Project documentation
-```
+### ☁️ 날씨 응답
+- 사용자의 현재 지역에 기반한 **기상청 또는 포털 날씨** 데이터 크롤링
+
+### 🗣️ 이야기 공유
+- 사용자가 자신의 이야기를 **저장**할 수 있으며  
+- 타 사용자의 이야기를 **무작위 응답**으로 제공
+
+### ⏰ 건강 알림
+- 사용자 입력 기반: 나이, 성별, 관심 질환
+- 정해진 시간마다 **복약, 운동, 건강 알림 전송**
+- Flutter 앱과 FastAPI 백엔드 간 연동
 
 ---
-## ⚙️ Installation
 
-1. **Clone the Repository**
-```bash
-git clone https://github.com/your-username/news-text-processing-api.git
-cd news-text-processing-api
-```
+## 🧩 기술 스택
 
-2. **Create Virtual Environment (Optional but Recommended)**
-```bash
-python -m venv venv
-source venv/bin/activate   # On Windows: venv\Scripts\activate
-```
+| 기술 | 설명 |
+|------|------|
+| **FastAPI** | 백엔드 서버, API 및 라우팅 |
+| **Flutter** | 프론트엔드 앱 구현 |
+| **SQLite** | 로컬 데이터 저장소 |
+| **BeautifulSoup** | 뉴스/날씨 웹 크롤링 |
+| **Pydantic** | 데이터 모델 유효성 검사 |
+| **Flutter Local Notifications** | 로컬 푸시 알림 구현 |
+| **TTS / STT API** | 음성 ↔ 텍스트 처리 (Kakao 등) |
+| **GitHub Actions (예정)** | CI/CD 자동화 구축 예정 |
 
-3. **Install Required Packages**
+---
+
+## 📁 디렉토리 구조
+
+backend/
+
+├── best_model/ # 음성 분류 모델 파일
+
+├── crawling/ # 뉴스/날씨 크롤링 모듈
+
+├── data/ # 테스트 및 저장용 샘플 데이터
+
+├── routers/ # FastAPI 라우터 (음성, 뉴스, 날씨, 알람 등)
+
+├── static/profile_images/ # 사용자 프로필 이미지 저장 폴더
+
+├── utils/ # 전처리 및 분류 유틸리티 함수 모음
+
+├── main.py # FastAPI 애플리케이션 진입점
+
+├── models.py # SQLAlchemy ORM 모델 정의
+
+├── database.py # DB 연결, 세션 관리
+
+├── requirements.txt # Python 패키지 명세
+
+└── README.md # 프로젝트 설명서
+
+
+---
+
+## 🧪 주요 파일 설명
+
+| 파일 | 설명 |
+|------|------|
+| `main.py` | FastAPI 서버 실행부 |
+| `models.py` | 사용자, 알람, 이야기 저장용 ORM 모델 |
+| `database.py` | DB 연결, 세션 구성 |
+| `routers/` | 기능별 API 라우터 (`/news`, `/weather`, `/story`, `/alarm` 등) |
+| `utils/` | 전처리, 의도 분류 모델 처리 등 유틸리티 |
+| `crawling/` | BeautifulSoup 기반 뉴스/날씨 데이터 수집 모듈 |
+
+---
+
+## 🚀 실행 방법
+
 ```bash
+# 패키지 설치
 pip install -r requirements.txt
-```
 
-4. **Set up `.env`**
-Create a `.env` file in the root directory with your OpenAI API Key:
-```plaintext
-OPENAI_API_KEY=your-openai-api-key-here
-```
-
----
-## 🚀 Running the Server
-
-```bash
+# FastAPI 서버 실행
 uvicorn main:app --reload
-```
-
-- Access Swagger UI for API testing at:
-  ```
-  http://localhost:8000/docs
-  ```
-
----
-## 🛠️ API Endpoints
-
-### POST `/process-text/`
-**Input:**  
-```json
-{
-  "text": "Input your text here"
-}
-```
-**Output:**  
-- Standardized Text
-- Cleaned Text (no slang/profanity)
-- Summarized Text
-
----
-
-### POST `/process-news/`
-**Input:**  
-```json
-{
-  "url": "https://news.example.com/article123"
-}
-```
-**Output:**  
-- News article body standardized
-- Cleaned and simplified version
-- Summarized main points
-
----
-
-## 📚 How It Works
-
-- **`/process-text/`**: Processes any user-provided text through OpenAI's GPT-4 Turbo model.
-- **`/process-news/`**: Crawls the news content from the given URL, then refines and summarizes it.
-- **Database (`processed_texts.db`)**: All processed results are saved with original and cleaned versions for traceability.
-
----
-
-## 🧠 Tech Stack
-
-- **FastAPI** 🚀 — High performance web framework
-- **OpenAI GPT-4 Turbo** 🤖 — Advanced language model
-- **SQLAlchemy** 🛢️ — ORM for database interaction
-- **SQLite** 🗂️ — Lightweight database
-- **BeautifulSoup** 🍲 — Web scraping library for news articles
-
----
-
